@@ -10,9 +10,7 @@ require "json"
 require "ostruct"
 
 
-# Generate a repeating message.
-#
-# This plugin is intented only as an example.
+# DISCLAIMER: Functions for this plugin are made public for the sake of creating concise unit tests
 
 class LogStash::Inputs::Jira < LogStash::Inputs::Base
   include LogStash::PluginMixins::HttpClient
@@ -87,7 +85,6 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
     client.execute!
   end
 
-  private
   def request_async(queue, path, parameters, request_options, callback)
     started = Time.now
 
