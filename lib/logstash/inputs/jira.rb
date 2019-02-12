@@ -8,6 +8,9 @@ require "socket" # for Socket.gethostname
 require "rufus/scheduler"
 require "json"
 require "ostruct"
+require "elasticsearch"
+require 'elasticsearch/transport'
+require 'multi_json'
 
 
 # DISCLAIMER: Functions for this plugin are made public for the sake of creating concise unit tests
@@ -73,14 +76,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
         'rest/api/2/search',
         {},
         {},
-        'handle_issues_response')
-
-    # request_async(
-    #   queue,
-    #   "rest/api/1.0/projects/%{project}/repos",
-    #   {:project => 'SOCK', :start => 0},
-    #   {:headers => {'Authorization' => @authorization}},
-    #   'handle_repos_response')
+       'handle_issues_response')
 
     client.execute!
   end
@@ -90,11 +86,11 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
 
     method = parameters[:method] ? parameters.delete(:method) : :get
 
-    uri = "#{@scheme}://#{@hostname}/#{path}" % parameters
+    uri = "http://#{@hostname}/#{path}" % parameters
 
     request_options[:headers] = {'Authorization' => @authorization}
 
-    @logger.info("Fetching URL", :method => method, :request => uri)
+    #@logger.info("Fetching URL", :method => method, :request => uri)
 
     client.parallel.send(method, uri, request_options).
         on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
@@ -103,11 +99,110 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
         }
   end
 
+  def request_bsync(queue, path, parameters, request_options, callback)
+
+    started = Time.now
+
+    method = parameters[:method] ? parameters.delete(:method) : :get
+
+    uri = "http://elasticsearch:9200/issue/doc/#{path}"
+
+    client.parallel.send(method, uri, request_options).
+        on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
+        on_failure {|exception|
+          handle_failure(queue, uri, parameters, exception, Time.now - started)
+        }
+  end
+
+
+  def handle_el_response(queue, uri, parameters, response, execution_time)
+
+    body = JSON.parse(response.body)
+
+    glob_key = body['_id']
+
+    checker = body['found']
+
+    if checker == false
+      puts "NEED TO ADD OBJECT"
+     request_async(
+          queue,
+          "rest/api/2/search?jql=key=%{issue}",
+          {:issue => body['_id']},
+          {},
+          'add_issue')
+
+    else
+      #puts "Issue already found"
+      doc_date = body['_source']['fields']['updated']
+      request_async(
+          queue,
+          "rest/api/2/search?jql=key=%{issue}",
+          {:issue => body['_id'], :doc_date => doc_date, :glob_key => glob_key},
+          {},
+          'check_last_update')
+
+    end
+
+  end
+
+  def add_issue(queue, uri, parameters, response, execution_time)
+    # Decode JSON
+    body = JSON.parse(response.body)
+
+    # Iterate over each project
+    issue = body['issues'][0]
+    @logger.info("Add Issue", :issue => issue['key'])
+      #Push project event into queue
+      event = LogStash::Event.new(issue)
+      event.set('[@metadata][index]', 'issue')
+      event.set('[@metadata][id]', issue['key'])
+      queue << event
+
+    #if request_count > 0
+      # Send HTTP requests
+      client.execute!
+    #end
+  end
+
+  def check_last_update(queue, uri, parameters, response, execution_time)
+    # Decode JSON
+    body = JSON.parse(response.body)
+
+    # Iterate over each project
+    #body['issues'].each do |issue|
+    key = body['issues'][0]['key']
+    issue = body['issues'][0]
+    date = body['issues'][0]['fields']['updated']
+    puts "-----------------------------------------------------------------------"
+
+    if date == parameters[:doc_date]
+      puts "Yes MATCH " + parameters[:glob_key] + " " +  key
+      puts "Yes MATCH " + parameters[:doc_date] + " " + date
+    else
+      puts "NOO MATCH " + parameters[:glob_key] + " " +  key
+      puts "NOO MATCH " + parameters[:doc_date] + " " + date
+      #Push project event into queue
+      event = LogStash::Event.new(issue)
+      event.set('[@metadata][index]', 'issue')
+      event.set('[@metadata][id]', issue['key'])
+      queue << event
+    end
+
+
+    #if request_count > 0
+    # Send HTTP requests
+    client.execute!
+    #end
+  end
+
+
+
   def handle_issues_response(queue, uri, parameters, response, execution_time)
     # Decode JSON
     body = JSON.parse(response.body)
 
-    @logger.info("Handle Issues Response", :uri => uri, :start => body['startAt'], :size => body['total'])
+    #@logger.info("Handle Issues Response", :uri => uri, :start => body['startAt'], :size => body['total'])
     nextStartAt = body['startAt'] + body['maxResults']
     request_count = 0
 
@@ -126,7 +221,16 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
 
     # Iterate over each project
     body['issues'].each do |issue|
-      @logger.info("Add Issue", :issue => issue['key'])
+      #@logger.info("Add Issue", :issue => issue['key'])
+      puts "-----------------------------------------------------------------------"
+
+      request_bsync(
+          queue,
+          issue['key'],
+          {},
+          {},
+          'handle_el_response')
+
 
       request_count += 1
 
@@ -136,15 +240,15 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
       end
 
       # Push project event into queue
-      event = LogStash::Event.new(issue)
-      event.set('[@metadata][index]', 'issue')
-      event.set('[@metadata][id]', issue['key'])
-      queue << event
-    end
+#      event = LogStash::Event.new(issue)
+#      event.set('[@metadata][index]', 'issue')
+#      event.set('[@metadata][id]', issue['key'])
+#      queue << event
+#    end
 
-    if request_count > 0
+#    if request_count > 0
       # Send HTTP requests
-      client.execute!
+#      client.execute!
     end
   end
 
