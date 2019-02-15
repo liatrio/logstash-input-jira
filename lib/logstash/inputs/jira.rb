@@ -11,9 +11,13 @@ require "ostruct"
 require "elasticsearch"
 require 'elasticsearch/transport'
 require 'multi_json'
-
+require 'jruby/synchronized'
 
 # DISCLAIMER: Functions for this plugin are made public for the sake of creating concise unit tests
+#
+ class SafeArray < Array
+   include JRuby::Synchronized
+ end
 
 class LogStash::Inputs::Jira < LogStash::Inputs::Base
   include LogStash::PluginMixins::HttpClient
@@ -71,7 +75,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
   def run_once(queue)
     @logger.info('RUN ONCE')
 
-    request_async(
+    request_jira_issues(
         queue,
         'rest/api/2/search',
         {},
@@ -81,7 +85,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
     client.execute!
   end
 
-  def request_async(queue, path, parameters, request_options, callback)
+  def request_jira_issues(queue, path, parameters, request_options, callback)
     started = Time.now
 
     method = parameters[:method] ? parameters.delete(:method) : :get
@@ -90,8 +94,6 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
 
     request_options[:headers] = {'Authorization' => @authorization}
 
-    #@logger.info("Fetching URL", :method => method, :request => uri)
-
     client.parallel.send(method, uri, request_options).
         on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
         on_failure {|exception|
@@ -99,13 +101,13 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
         }
   end
 
-  def request_bsync(queue, path, parameters, request_options, callback)
+  def request_es_docs(queue, path, parameters, request_options, callback)
 
     started = Time.now
 
     method = parameters[:method] ? parameters.delete(:method) : :get
 
-    uri = "http://elasticsearch:9200/issue/doc/#{path}"
+    uri = "http://elasticsearch:9200/#{path}"
 
     client.parallel.send(method, uri, request_options).
         on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
@@ -114,18 +116,72 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
         }
   end
 
+  def request_issue_repos(queue, path, parameters, request_options, callback)
 
-  def handle_el_response(queue, uri, parameters, response, execution_time)
+    started = Time.now
+
+    method = parameters[:method] ? parameters.delete(:method) : :get
+
+    uri = "http://jira.liatr.io/rest/dev-status/1.0/issue/detail?issueId=#{path}&applicationType=stash&dataType=repository"
+
+    request_options[:headers] = {'Authorization' => @authorization}
+
+    client.parallel.send(method, uri, request_options).
+        on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
+        on_failure {|exception|
+          handle_failure(queue, uri, parameters, exception, Time.now - started)
+        }
+  end
+
+  def handle_issues_response(queue, uri, parameters, response, execution_time)
+    # Decode JSON
+    body = JSON.parse(response.body)
+
+    @logger.info("Handle Issues Response", :uri => uri, :start => body['startAt'], :size => body['total'])
+    nextStartAt = body['startAt'] + body['maxResults']
+    request_count = 0
+
+    # Fetch addition project pages
+    unless body['total'] < nextStartAt
+      request_jira_issues(
+          queue,
+          "rest/api/2/search",
+          {},
+          {:query => {'startAt' => nextStartAt}},
+          'handle_issues_response'
+      )
+
+      client.execute!
+    end
+
+    # Iterate over each project
+    body['issues'].each do |issue|
+      #@logger.info("Add Issue", :issue => issue['key'])
+
+      request_es_docs(
+          queue,
+          "issue/doc/#{issue['key']}",
+          {:issueId => issue['id'], :issueName => issue['key']},
+          {},
+          'check_issue_exists')
+
+      request_count += 1
+
+      if request_count > 1
+       request_count = 0
+       client.execute!
+      end
+
+    end
+  end
+
+
+  def check_issue_exists(queue, uri, parameters, response, execution_time)
 
     body = JSON.parse(response.body)
 
-    glob_key = body['_id']
-
-    checker = body['found']
-
-    if checker == false
-      puts "NEED TO ADD OBJECT"
-     request_async(
+    if body['found'] == false
+      request_jira_issues(
           queue,
           "rest/api/2/search?jql=key=%{issue}",
           {:issue => body['_id']},
@@ -133,17 +189,57 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
           'add_issue')
 
     else
-      #puts "Issue already found"
-      doc_date = body['_source']['fields']['updated']
-      request_async(
+      request_es_docs(
+          queue,
+          "lead_time/doc/lead-#{parameters[:issueName]}",
+          {:issueId => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => body['_source']['fields']['updated']},
+          {},
+          'check_lead_exists')
+
+      request_jira_issues(
           queue,
           "rest/api/2/search?jql=key=%{issue}",
-          {:issue => body['_id'], :doc_date => doc_date, :glob_key => glob_key},
+          {:issue => body['_id'], :createdDate => body['_source']['fields']['updated']},
           {},
           'check_last_update')
-
     end
+  end
 
+  def check_lead_exists(queue, uri, parameters, response, execution_time)
+
+    body = JSON.parse(response.body)
+
+    if body['found'] == false
+
+      request_issue_repos(
+          queue,
+          parameters[:issueId],
+          {:id => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => parameters[:createdDate]},
+          {},
+          'create_lead_time')
+
+    else
+      #PUTS LEAD TIME DOC EXISTS ALREADY DO NOTHING
+    end
+  end
+
+  def check_last_update(queue, uri, parameters, response, execution_time)
+    # Decode JSON
+    body = JSON.parse(response.body)
+
+    # Iterate over each project
+    issue = body['issues'][0]
+    date = body['issues'][0]['fields']['updated']
+
+    if date == parameters[:createdDate]
+      #DOC HASN'T BEEN UPDATED DO NOTHING
+    else
+      #Push project event into queue
+      event = LogStash::Event.new(issue)
+      event.set('[@metadata][index]', 'issue')
+      event.set('[@metadata][id]', issue['key'])
+      queue << event
+    end
   end
 
   def add_issue(queue, uri, parameters, response, execution_time)
@@ -158,97 +254,30 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
       event.set('[@metadata][index]', 'issue')
       event.set('[@metadata][id]', issue['key'])
       queue << event
-
-    #if request_count > 0
-      # Send HTTP requests
-      client.execute!
-    #end
   end
 
-  def check_last_update(queue, uri, parameters, response, execution_time)
-    # Decode JSON
+  def create_lead_time(queue, uri, parameters, response, execution_time)
+
     body = JSON.parse(response.body)
 
-    # Iterate over each project
-    #body['issues'].each do |issue|
-    key = body['issues'][0]['key']
-    issue = body['issues'][0]
-    date = body['issues'][0]['fields']['updated']
-    puts "-----------------------------------------------------------------------"
+    repoCount = body['detail'][0]['repositories'].count
 
-    if date == parameters[:doc_date]
-      puts "Yes MATCH " + parameters[:glob_key] + " " +  key
-      puts "Yes MATCH " + parameters[:doc_date] + " " + date
+    if repoCount > 0
+      puts "REPO is LINKED"
+
+      repo_url = body['detail'][0]['repositories'][0]['url']
+
+      new_lead = Hash.new
+      new_lead["id"] = parameters[:issueName]
+      new_lead["created_at"] = parameters[:createdDate]
+      new_lead["repo_url"] = repo_url
+
+      lead = LogStash::Event.new(new_lead)
+      lead.set('[@metadata][index]', 'lead_time')
+      lead.set('[@metadata][id]', 'lead-' + parameters[:issueName])
+      queue << lead
     else
-      puts "NOO MATCH " + parameters[:glob_key] + " " +  key
-      puts "NOO MATCH " + parameters[:doc_date] + " " + date
-      #Push project event into queue
-      event = LogStash::Event.new(issue)
-      event.set('[@metadata][index]', 'issue')
-      event.set('[@metadata][id]', issue['key'])
-      queue << event
-    end
-
-
-    #if request_count > 0
-    # Send HTTP requests
-    client.execute!
-    #end
-  end
-
-
-
-  def handle_issues_response(queue, uri, parameters, response, execution_time)
-    # Decode JSON
-    body = JSON.parse(response.body)
-
-    #@logger.info("Handle Issues Response", :uri => uri, :start => body['startAt'], :size => body['total'])
-    nextStartAt = body['startAt'] + body['maxResults']
-    request_count = 0
-
-    # Fetch addition project pages
-    unless body['total'] < nextStartAt
-      request_async(
-          queue,
-          "rest/api/2/search",
-          {},
-          {:query => {'startAt' => nextStartAt}},
-          'handle_issues_response'
-      )
-
-     client.execute!
-    end
-
-    # Iterate over each project
-    body['issues'].each do |issue|
-      #@logger.info("Add Issue", :issue => issue['key'])
-      puts "-----------------------------------------------------------------------"
-
-      request_bsync(
-          queue,
-          issue['key'],
-          {},
-          {},
-          'handle_el_response')
-
-
-      request_count += 1
-
-      if request_count > 1
-        request_count = 0
-        client.execute!
-      end
-
-      # Push project event into queue
-#      event = LogStash::Event.new(issue)
-#      event.set('[@metadata][index]', 'issue')
-#      event.set('[@metadata][id]', issue['key'])
-#      queue << event
-#    end
-
-#    if request_count > 0
-      # Send HTTP requests
-#      client.execute!
+      #puts "NO REPO LINK EXITS TO TICKET"
     end
   end
 
