@@ -145,7 +145,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
     unless body['total'] < nextStartAt
       request_jira_issues(
           queue,
-          "rest/api/2/search",
+          "rest/api/2/search?expand=changelog",
           {},
           {:query => {'startAt' => nextStartAt}},
           'handle_issues_response'
@@ -157,11 +157,26 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
     # Iterate over each project
     body['issues'].each do |issue|
       #@logger.info("Add Issue", :issue => issue['key'])
+      #
+      #
+      #
+      #
+      #
+
+      status = []
+      issue['changelog']['histories'].each do |change|
+        change['items'].each do |items|
+          if items['field'] == 'status' && items['toString'] == "In Progress"
+            status.push(change["created"])
+          end
+        end
+      end
+
 
       request_es_docs(
           queue,
           "issue/doc/#{issue['key']}",
-          {:issueId => issue['id'], :issueName => issue['key']},
+          {:issueId => issue['id'], :issueName => issue['key'], :started_At => status[0], :createdDate => issue['fields']["created"]},
           {},
           'check_issue_exists')
 
@@ -192,10 +207,11 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
           'add_issue')
 
     else
+
       request_es_docs(
           queue,
           "lead_time/doc/lead-#{parameters[:issueName]}",
-          {:issueId => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => body['_source']['fields']['updated']},
+          {:issueId => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => parameters[:createdDate], :started_At => parameters[:started_At]},
           {},
           'check_lead_exists')
 
@@ -219,7 +235,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
       request_issue_repos(
           queue,
           parameters[:issueId],
-          {:id => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => parameters[:createdDate]},
+          {:id => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => parameters[:createdDate], :started_At => parameters[:started_At]},
           {},
           'create_lead_time')
 
@@ -284,61 +300,19 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
 
     if repoCount > 0
 
-      repo_url = body['detail'][0]['repositories'][0]['url']
-
-      client = Elasticsearch::Client.new(:hosts => "#{@elastic_scheme}://#{@elastic_host}:#{@elastic_port}")
-
-
-      temp = client.search index: 'repo', body: { "query": {
-          "bool": {
-              "should": [
-                  {
-                      "nested": {
-                          "path": "links.clone",
-                          "query": {
-                              "term": {
-                                  "links.clone.href": {
-                                      "value": repo_url
-                                  }
-                              }
-                          }
-                      }
-                  },
-                  {
-                      "nested": {
-                          "path": "links.self",
-                          "query": {
-                              "term": {
-                                  "links.self.href": {
-                                      "value": repo_url
-                                  }
-                              }
-                          }
-                      }
-                  }
-              ]
-          }
-      }
-      }
-
-
-      #gg = temp['hits']['hits'][0]['_id']
 
       commits = []
 
       body['detail'][0]['repositories'][0]['commits'].each do |commit|
-        commits.push(commit['id'])
+
+        commits.push( {id: commit['id']} )
       end
-
-
-      puts commits
 
 
       new_lead = Hash.new
       new_lead["id"] = parameters[:issueName]
       new_lead["created_at"] = parameters[:createdDate]
-      #new_lead["repo_id"] =
-      #new_lead["repo_id"] = gg
+      new_lead["started_at"] = parameters[:started_At]
       new_lead["commits"] = commits
       #
       # put commits
@@ -352,6 +326,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
       #puts "NO REPO LINK EXITS TO TICKET"
     end
   end
+
 
   def handle_failure(queue, path, parameters, exception, execution_time)
     @logger.error('HTTP Request failed', :path => path, :parameters => parameters, :exception => exception, :backtrace => exception.backtrace);
