@@ -132,7 +132,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
         }
   end
 
-  ## CALL TO ADD ALL ISSUES INTO QUEUE AND CHECK EACH ISSUE TO SEE IF THEY ARE ALREADY IN ES
+  ## CALL TO ADD ALL ISSUES INTO QUEUE AND CHECK EACH ISSUE TO SEE IF THEY ARE ALREADY IN ELASTICSEARCH
   def handle_issues_response(queue, uri, parameters, response, execution_time)
     # Decode JSON
     body = JSON.parse(response.body)
@@ -154,15 +154,8 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
       client.execute!
     end
 
-    # Iterate over each project
+    # Iterate over each project and changelog of each issue looking for a new created time
     body['issues'].each do |issue|
-      #@logger.info("Add Issue", :issue => issue['key'])
-      #
-      #
-      #
-      #
-      #
-
       status = []
       issue['changelog']['histories'].each do |change|
         change['items'].each do |items|
@@ -172,7 +165,7 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
         end
       end
 
-
+      #Checks to see if an issue already exists in elasticsearch
       request_es_docs(
           queue,
           "issue/doc/#{issue['key']}",
@@ -224,27 +217,26 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
     end
   end
 
-  ## CHECKS IF LEAT TIME DOC ALREADY EXISTS
+  ## CHECKS IF LEAD TIME DOC ALREADY EXISTS
   # IF IT DOES NOT CREATE NEW LEAD TIME DOC
   def check_lead_exists(queue, uri, parameters, response, execution_time)
 
     body = JSON.parse(response.body)
 
     if body['found'] == false
-
       request_issue_repos(
           queue,
           parameters[:issueId],
           {:id => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => parameters[:createdDate], :started_At => parameters[:started_At]},
           {},
           'create_lead_time')
-
     else
       #PUTS LEAD TIME DOC EXISTS ALREADY DO NOTHING
     end
   end
 
-  ## CHECKS AND SEE'S IF ISSUE HAS BEEN UPDATED AND CHECKS IF ISSUE DOC NEEDS UPDATING
+  ## CHECKS AND SEE'S IF ISSUE HAS BEEN UPDATED
+  # IF DATES DO NOT MATCH UPDATE ISSUE DOC WITH NEW INFO
   def check_last_update(queue, uri, parameters, response, execution_time)
     # Decode JSON
     body = JSON.parse(response.body)
@@ -279,43 +271,27 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
       queue << event
   end
 
-  ## FETCHES REPO ID TO BE ADDED TO LEAD_TIME DOC
-  def fetch_repo_id(queue, uri, parameters, response, execution_time)
-    # Decode JSON
-    body = JSON.parse(response.body)
-
-    # Iterate over each project
-    repo_id = body['hits']['hits'][0]
-
-    return repo_id
-  end
-
 
   ## CREATES A LEAD TIME DOC TO BE PUSHED TO ELASTICSEARCH
+  # Checks if any repos are linked. If size greater than 0 then add repo to lead time
+  # and add all commit history to lead time doc.
   def create_lead_time(queue, uri, parameters, response, execution_time)
 
     body = JSON.parse(response.body)
-
     repoCount = body['detail'][0]['repositories'].count
 
     if repoCount > 0
-
-
       commits = []
 
       body['detail'][0]['repositories'][0]['commits'].each do |commit|
-
         commits.push( {id: commit['id']} )
       end
-
 
       new_lead = Hash.new
       new_lead["id"] = parameters[:issueName]
       new_lead["created_at"] = parameters[:createdDate]
       new_lead["started_at"] = parameters[:started_At]
       new_lead["commits"] = commits
-      #
-      # put commits
 
       lead = LogStash::Event.new(new_lead)
       lead.set('[@metadata][index]', 'lead_time')
