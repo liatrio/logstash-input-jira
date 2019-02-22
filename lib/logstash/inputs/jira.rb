@@ -71,59 +71,22 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
   def run_once(queue)
     @logger.info('RUN ONCE')
 
-    request_jira_issues(
+
+    request_service(
         queue,
-        'rest/api/2/search',
+        "http://#{@jira_hostname}/rest/api/2/search",
         {},
-        {},
+        {:headers => {'Authorization' => @authorization}},
        'handle_issues_response')
 
     client.execute!
   end
 
-  ## BASE API CALL AGAINST JIRA API TO GET LIST OF ISSUES
-  def request_jira_issues(queue, path, parameters, request_options, callback)
+  ## BASE API CALL REQUEST INFORMATION FROM JIRA AND ELASTICSEARCH
+  def request_service(queue, uri, parameters, request_options, callback)
     started = Time.now
 
     method = parameters[:method] ? parameters.delete(:method) : :get
-
-    uri = "http://#{@jira_hostname}/#{path}" % parameters
-
-    request_options[:headers] = {'Authorization' => @authorization}
-
-    client.parallel.send(method, uri, request_options).
-        on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
-        on_failure {|exception|
-          handle_failure(queue, uri, parameters, exception, Time.now - started)
-        }
-  end
-
-  ## BASE API AGAINST ELASTICSEARCH SERVER TO GET DOCS ALREADY IN ELASTICSEARCH
-  def request_es_docs(queue, path, parameters, request_options, callback)
-
-    started = Time.now
-
-    method = parameters[:method] ? parameters.delete(:method) : :get
-
-    uri = "#{@elastic_scheme}://#{@elastic_host}:#{@elastic_port}/#{path}"
-
-    client.parallel.send(method, uri, request_options).
-        on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
-        on_failure {|exception|
-          handle_failure(queue, uri, parameters, exception, Time.now - started)
-        }
-  end
-
-  ## JIRA DEV API TO GET LINKED REPOS TO ISSUES
-  def request_issue_repos(queue, path, parameters, request_options, callback)
-
-    started = Time.now
-
-    method = parameters[:method] ? parameters.delete(:method) : :get
-
-    uri = "http://jira.liatr.io/rest/dev-status/1.0/issue/detail?issueId=#{path}&applicationType=stash&dataType=repository"
-
-    request_options[:headers] = {'Authorization' => @authorization}
 
     client.parallel.send(method, uri, request_options).
         on_success {|response| self.send(callback, queue, uri, parameters, response, Time.now - started)}.
@@ -143,11 +106,11 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
 
     # Fetch addition project pages
     unless body['total'] < nextStartAt
-      request_jira_issues(
+      request_service(
           queue,
-          "rest/api/2/search?expand=changelog",
+          "http://#{@jira_hostname}/rest/api/2/search?expand=changelog",
           {},
-          {:query => {'startAt' => nextStartAt}},
+          {:query => {'startAt' => nextStartAt}, :headers => {'Authorization' => @authorization}},
           'handle_issues_response'
       )
 
@@ -166,9 +129,9 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
       end
 
       #Checks to see if an issue already exists in elasticsearch
-      request_es_docs(
+      request_service(
           queue,
-          "issue/doc/#{issue['key']}",
+          "#{@elastic_scheme}://#{@elastic_host}:#{@elastic_port}/issue/doc/#{issue['key']}",
           {:issueId => issue['id'], :issueName => issue['key'], :started_At => status[0], :createdDate => issue['fields']["created"]},
           {},
           'check_issue_exists')
@@ -192,27 +155,28 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
     body = JSON.parse(response.body)
 
     if body['found'] == false
-      request_jira_issues(
+
+      request_service(
           queue,
-          "rest/api/2/search?jql=key=%{issue}",
+          "http://#{@jira_hostname}/rest/api/2/search?jql=key=#{body['_id']}",
           {:issue => body['_id']},
-          {},
+          {:headers => {'Authorization' => @authorization}},
           'add_issue')
 
     else
 
-      request_es_docs(
+      request_service(
           queue,
-          "lead_time/doc/lead-#{parameters[:issueName]}",
+          "#{@elastic_scheme}://#{@elastic_host}:#{@elastic_port}/lead_time/doc/lead-#{parameters[:issueName]}",
           {:issueId => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => parameters[:createdDate], :started_At => parameters[:started_At]},
           {},
           'check_lead_exists')
 
-      request_jira_issues(
+      request_service(
           queue,
-          "rest/api/2/search?jql=key=%{issue}",
+          "http://#{@jira_hostname}/rest/api/2/search?jql=key=#{body['_id']}",
           {:issue => body['_id'], :createdDate => body['_source']['fields']['updated']},
-          {},
+          {:headers => {'Authorization' => @authorization}},
           'check_last_update')
     end
   end
@@ -224,11 +188,11 @@ class LogStash::Inputs::Jira < LogStash::Inputs::Base
     body = JSON.parse(response.body)
 
     if body['found'] == false
-      request_issue_repos(
+      request_service(
           queue,
-          parameters[:issueId],
+          "http://#{@jira_hostname}/rest/dev-status/1.0/issue/detail?issueId=#{parameters[:issueId]}&applicationType=stash&dataType=repository",
           {:id => parameters[:issueId], :issueName => parameters[:issueName], :createdDate => parameters[:createdDate], :started_At => parameters[:started_At]},
-          {},
+          {:headers => {'Authorization' => @authorization}},
           'create_lead_time')
     else
       #PUTS LEAD TIME DOC EXISTS ALREADY DO NOTHING
