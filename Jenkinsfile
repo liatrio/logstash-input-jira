@@ -8,6 +8,12 @@ pipeline {
         PUSH_URL='docker.artifactory'
     }
     stages {
+       stage('Unit test') {
+            environment { HOME="." }
+            agent {
+                docker { image 'node:10.15-alpine' }
+            }
+        }
         stage('Build image') {
             steps {
                 sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
