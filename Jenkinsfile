@@ -5,7 +5,7 @@ pipeline {
         IMAGE='liatrio/jira'
         SLACK_CHANNEL="flywheel"
         APP_DOMAIN='liatr.io'
-        URL='docker.artifactory'
+        PUSH_URL='docker.artifactory'
     }
     stages {
         stage('Build image') {
@@ -26,9 +26,9 @@ pipeline {
             }
             steps {
                     withCredentials([usernamePassword(credentialsId: 'artifactory', passwordVariable: 'artifactoryPass', usernameVariable: 'artifactoryUser')]) {
-                    sh "docker login -u ${env.dockerUsername} -p ${env.dockerPassword} ${URL}.${APP_DOMAIN}"
-                    sh "docker push ${URL}.${APP_DOMAIN}/${IMAGE}:${GIT_COMMIT[0..10]}"
-                    sh "docker push ${URL}.${APP_DOMAIN}/${IMAGE}:latest"
+                    sh "docker login -u ${env.dockerUsername} -p ${env.dockerPassword} ${PUSH_URL}.${APP_DOMAIN}"
+                    sh "docker push ${PUSH_URL}.${APP_DOMAIN}/${IMAGE}:${GIT_COMMIT[0..10]}"
+                    sh "docker push ${PUSH_URL}.${APP_DOMAIN}/${IMAGE}:latest"
                 }
             }
         }
