@@ -1,5 +1,5 @@
 pipeline {
-    agent { dockerfile true } 
+    agent none 
 
     environment {
         IMAGE='liatrio/jira'
@@ -8,19 +8,18 @@ pipeline {
         PUSH_URL='docker.artifactory'
     }
     stages {
-        stage('Unit test') {
-            environment { HOME="." }
-            agent {
-                docker { image 'node:10.15-alpine' }
-            }
-            steps {
-              sh 'echo "hello world"'
-            }
-        }
         stage('Build image') {
-            steps {
-                sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
+          agent {
+            docker {
+              image 'docker:18.09'
+              args  '--privileged	-u 0 -v /var/run/docker.sock:/var/run/docker.sock'
             }
+          }
+          steps {
+            sh "git clone https://github.com/liatrio/logstash-input-jira"
+            sh "git checkout ENG-424-Jenkins-Pipeline"
+            sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
+          }
         }
         stage('Publish image') {
             when { 
