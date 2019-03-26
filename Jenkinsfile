@@ -19,8 +19,7 @@ pipeline {
             }
           }
           steps {
-            sh "git clone https://github.com/liatrio/logstash-input-jira"
-            sh "git checkout ENG-424-Jenkins-Pipeline"
+            git branch: 'ENG-424-Jenkins-Pipeline', url: 'https://github.com/liatrio/logstash-input-jira'
             sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
           }
         }
