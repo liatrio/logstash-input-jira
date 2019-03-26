@@ -8,7 +8,7 @@ pipeline {
         PUSH_URL='docker.artifactory'
     }
     stages {
-       stage('Unit test') {
+        stage('Unit test') {
             environment { HOME="." }
             agent {
                 docker { image 'node:10.15-alpine' }
