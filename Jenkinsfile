@@ -13,6 +13,9 @@ pipeline {
             agent {
                 docker { image 'node:10.15-alpine' }
             }
+            steps {
+              sh 'echo "hello world"'
+            }
         }
         stage('Build image') {
             steps {
