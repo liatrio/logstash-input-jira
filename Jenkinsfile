@@ -9,7 +9,12 @@ pipeline {
     }
     stages {
         stage('Build image') {
-            agent { dockerfile true }
+            agent { 
+              docker {
+                image 'docker.elastic.co/logstash/logstash:6.5.4'
+                args  '--privileged	-u 0 -v /var/run/docker.sock:/var/run/docker.sock'
+              }
+            }
             steps {
                 sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
             }
