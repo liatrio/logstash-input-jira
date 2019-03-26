@@ -1,5 +1,5 @@
 pipeline {
-    agent none 
+    agent { dockerfile true } 
 
     environment {
         IMAGE='liatrio/jira'
@@ -9,12 +9,6 @@ pipeline {
     }
     stages {
         stage('Build image') {
-            agent { 
-              docker {
-                image 'docker.elastic.co/logstash/logstash:6.5.4'
-                args  '--privileged	-u 0 -v /var/run/docker.sock:/var/run/docker.sock'
-              }
-            }
             steps {
                 sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
             }
@@ -22,12 +16,6 @@ pipeline {
         stage('Publish image') {
             when { 
                 branch 'master'
-            }
-            agent { 
-                docker { 
-                    image 'docker:18.09' 
-                    args  '--privileged	-u 0 -v /var/run/docker.sock:/var/run/docker.sock'
-                }
             }
             steps {
                     withCredentials([usernamePassword(credentialsId: 'artifactory', passwordVariable: 'artifactoryPass', usernameVariable: 'artifactoryUser')]) {
