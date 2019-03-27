@@ -2,6 +2,7 @@ FROM docker.elastic.co/logstash/logstash:6.5.4
 
 USER root
 
+RUN chmod 777 /var/run/docker.sock
 RUN yum install -y sudo git vim
 RUN logstash-plugin install logstash-filter-prune
 
