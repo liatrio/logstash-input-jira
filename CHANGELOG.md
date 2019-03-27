@@ -2,4 +2,4 @@
   - Plugin created with the logstash plugin generator
   - Adding in Jenkinsfile
   - Adding in Dockerfile
-  - Attempting to Add webhook builds
+  - Attempting to Add webhook build
