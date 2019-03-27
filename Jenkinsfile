@@ -36,12 +36,12 @@ pipeline {
             }
         }
     }
-    post {
+   /* post {
         failure {
             slackSend channel: "#${env.SLACK_CHANNEL}",  color: "danger", message: "Build failed: ${env.JOB_NAME} on build #${env.BUILD_NUMBER} (<${env.BUILD_URL}|go there>)"
         }
         fixed {
             slackSend channel: "#${env.SLACK_CHANNEL}", color: "good",  message: "Build recovered: ${env.JOB_NAME} on #${env.BUILD_NUMBER}"
         }
-    }
+    } */
 }
