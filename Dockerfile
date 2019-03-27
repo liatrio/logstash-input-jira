@@ -2,8 +2,8 @@ FROM docker.elastic.co/logstash/logstash:6.5.4
 
 USER root
 
-RUN logstash-plugin install logstash-filter-prune
 RUN yum install -y sudo git vim
+RUN logstash-plugin install logstash-filter-prune
 
 USER logstash
 ENV PATH=$PATH:/usr/share/logstash/vendor/jruby/bin/
