@@ -2,7 +2,6 @@ FROM docker.elastic.co/logstash/logstash:6.5.4
 
 USER root
 
-RUN iptables -P FORWARD ACCEPT
 RUN yum install -y sudo git vim
 RUN logstash-plugin install logstash-filter-prune
 
