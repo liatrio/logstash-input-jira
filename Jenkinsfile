@@ -15,8 +15,8 @@ pipeline {
               containerTemplate {
                 name 'logstash'
                 image 'docker:18.09'
-                command: 'cat'
-                ttyEnabled: true
+                command 'cat'
+                ttyEnabled true
               }
             }
           }
