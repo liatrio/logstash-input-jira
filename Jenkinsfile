@@ -17,6 +17,14 @@ pipeline {
                 image 'docker:18.09-dind'
                 command 'cat'
                 ttyEnabled true
+                yaml 
+                  spec:
+                    securityContext:
+                      privileged: true
+                    containers:
+                      - name: logstash
+                        securityContext:
+                          privileged: true
               }
             }
           }
