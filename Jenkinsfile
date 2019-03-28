@@ -14,7 +14,7 @@ pipeline {
               label "logstash"
               containerTemplate {
                 name 'logstash'
-                image 'docker:18.09'
+                image 'docker:18.09-dind'
                 command 'cat'
                 ttyEnabled true
               }
