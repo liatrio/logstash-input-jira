@@ -21,6 +21,7 @@ pipeline {
 spec:
   securityContext:
     privileged: true
+    runAsUser: 0
   containers:
     - name: logstash
       securityContext:
