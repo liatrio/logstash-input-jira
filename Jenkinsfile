@@ -12,6 +12,12 @@ pipeline {
           agent {
             kubernetes {
               label "logstash"
+              containerTemplate {
+                name 'logstash'
+                image 'docker:18.09'
+                command 'cat'
+                ttyEnabled true
+              }
             }
           }
           steps {
