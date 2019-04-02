@@ -10,7 +10,9 @@ pipeline {
     stages {
         stage('Build image') {
           agent {
-            label "logstash"
+            kubernetes {
+              label "logstash"
+            }
           }
           steps {
             git branch: 'ENG-424-Jenkins-Pipeline', url: 'https://github.com/liatrio/logstash-input-jira'
