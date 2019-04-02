@@ -1,5 +1,5 @@
 pipeline {
-    agent none 
+    agent none
 
     environment {
         IMAGE='liatrio/jira'
@@ -15,7 +15,8 @@ pipeline {
               containerTemplate {
                 name 'logstash'
                 image 'docker:18.09-dind'
-                command 'cat'
+                command '/bin/sh -c'
+                args 'cat'
                 ttyEnabled true
               }
             }
@@ -26,7 +27,7 @@ pipeline {
           }
         }
         stage('Publish image') {
-            when { 
+            when {
                 branch 'master'
             }
             steps {
