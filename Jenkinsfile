@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Build image') {
           steps {
-            container('ruby') {
+            container('logstash') {
               git branch: 'ENG-424-Jenkins-Pipeline', url: 'https://github.com/liatrio/logstash-input-jira'
               sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
             }
