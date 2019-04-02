@@ -1,5 +1,7 @@
 pipeline {
-    agent none
+    agent {
+      label "logstash"
+    }
 
     environment {
         IMAGE='liatrio/jira'
@@ -9,14 +11,11 @@ pipeline {
     }
     stages {
         stage('Build image') {
-          agent {
-            kubernetes {
-              label "logstash"
-            }
-          }
           steps {
-            git branch: 'ENG-424-Jenkins-Pipeline', url: 'https://github.com/liatrio/logstash-input-jira'
-            sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
+            container('ruby') {
+              git branch: 'ENG-424-Jenkins-Pipeline', url: 'https://github.com/liatrio/logstash-input-jira'
+              sh "docker build --pull -t ${IMAGE}:${GIT_COMMIT[0..10]} -t ${IMAGE}:latest ."
+            }
           }
         }
         stage('Publish image') {
