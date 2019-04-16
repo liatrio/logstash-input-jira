@@ -2,7 +2,6 @@ pipeline {
   agent {
     label "logstash"
   }
-
   environment {
     ORG = 'liatrio'
     APP_NAME = 'logstash-input-jira'
@@ -34,12 +33,12 @@ pipeline {
       }
     }
   }
-  /* post {
-  failure {
-  slackSend channel: "#${env.SLACK_CHANNEL}",  color: "danger", message: "Build failed: ${env.JOB_NAME} on build #${env.BUILD_NUMBER} (<${env.BUILD_URL}|go there>)"
-}
-fixed {
-slackSend channel: "#${env.SLACK_CHANNEL}", color: "good",  message: "Build recovered: ${env.JOB_NAME} on #${env.BUILD_NUMBER}"
-}
-} */
+  post {
+    failure {
+      slackSend channel: "#${env.SLACK_CHANNEL}",  color: "danger", message: "Build failed: ${env.JOB_NAME} on build #${env.BUILD_NUMBER} (<${env.BUILD_URL}|go there>)"
+    }
+    fixed {
+      slackSend channel: "#${env.SLACK_CHANNEL}", color: "good",  message: "Build recovered: ${env.JOB_NAME} on #${env.BUILD_NUMBER}"
+    }
+  }
 }
