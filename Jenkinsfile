@@ -6,7 +6,7 @@ pipeline {
   environment {
     ORG = 'liatrio'
     APP_NAME = 'logstash-input-jira'
-    CHARTMUSEUM_CREDS = credentials('jenkins-x-chartmuseum')
+    //CHARTMUSEUM_CREDS = credentials('jenkins-x-chartmuseum')
     DOCKER_REGISTRY = 'docker.artifactory.liatr.io'
     SLACK_CHANNEL="flywheel"
   }
