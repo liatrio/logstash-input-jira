@@ -7,14 +7,14 @@ pipeline {
     ORG = 'liatrio'
     APP_NAME = 'logstash-input-jira'
     CHARTMUSEUM_CREDS = credentials('jenkins-x-chartmuseum')
-
+    DOCKER_REGISTRY = 'docker.artifactory.liatr.io'
     SLACK_CHANNEL="flywheel"
   }
   stages {
     stage('Build image') {
       steps {
         container('logstash') {
-          sh "docker build -t $DOCKER_REGISTRY/$ORG/$APP_NAME:${GIT_COMMIT[0..10]} -t $DOCKER_REGISTRY/$ORG/$APP_NAME:latest ."
+          sh "docker build -t ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]} -t ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:latest ."
         }
       }
     }
@@ -24,8 +24,8 @@ pipeline {
       }
       steps {
         container('logstash') {
-          sh "docker push $DOCKER_REGISTRY/$ORG/$APP_NAME:${GIT_COMMIT[0..10]}"
-          sh "docker push $DOCKER_REGISTRY/$ORG/$APP_NAME:latest"
+          sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]}"
+          sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:latest"
         }
       }
     }
