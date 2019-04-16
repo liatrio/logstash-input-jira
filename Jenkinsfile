@@ -23,10 +23,12 @@ pipeline {
        // branch 'master'
      // }
       steps {
+        container('logstash') {
           withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', passwordVariable: 'ARTIFACTORYPASS', usernameVariable: 'ARTIFACTORYUSER')]) {
             sh "docker login -u ${env.ARTIFACTORYUSER} -p ${env.ARTIFACTORYPASS} ${DOCKER_REGISTRY}"
             sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]}"
             sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:latest"
+        }
         }
       }
     }
