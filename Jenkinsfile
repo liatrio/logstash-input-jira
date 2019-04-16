@@ -24,8 +24,11 @@ pipeline {
      // }
       steps {
         container('logstash') {
-          sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]}"
-          sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:latest"
+          withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', passwordVariable: 'ARTIFACTORYPASS', usernameVariable: 'ARTIFACTORYUSER')]) {
+            sh "docker login -u $ARTIFACTORYUSER -p $ARTIFACTORYPASS ${DOCKER_REGISTRY}"
+            sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]}"
+            sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:latest"
+          }
         }
       }
     }
