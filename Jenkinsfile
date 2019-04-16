@@ -22,13 +22,17 @@ pipeline {
      // when {
        // branch 'master'
      // }
+     agent {
+       docker {
+         image 'docker:18.09'
+         args  '--privileged	-u 0 -v /var/run/docker.sock:/var/run/docker.sock'
+       }
+     }
       steps {
-        container('logstash') {
           withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', passwordVariable: 'ARTIFACTORYPASS', usernameVariable: 'ARTIFACTORYUSER')]) {
-            sh "docker login -u ${env.dockerUsername} -p ${env.dockerPassword} ${DOCKER_REGISTRY}"
+            sh "docker login -u ${env.ARTIFACTORYUSER} -p ${env.ARTIFACTORYPASS} ${DOCKER_REGISTRY}"
             sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]}"
             sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:latest"
-          }
         }
       }
     }
