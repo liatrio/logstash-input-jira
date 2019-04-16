@@ -19,9 +19,9 @@ pipeline {
       }
     }
     stage('Publish image') {
-      when {
-        branch 'master'
-      }
+     // when {
+       // branch 'master'
+     // }
       steps {
         container('logstash') {
           sh "docker push ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]}"
