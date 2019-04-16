@@ -22,12 +22,6 @@ pipeline {
      // when {
        // branch 'master'
      // }
-     agent {
-       docker {
-         image 'docker:18.09'
-         args  '--privileged	-u 0 -v /var/run/docker.sock:/var/run/docker.sock'
-       }
-     }
       steps {
           withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', passwordVariable: 'ARTIFACTORYPASS', usernameVariable: 'ARTIFACTORYUSER')]) {
             sh "docker login -u ${env.ARTIFACTORYUSER} -p ${env.ARTIFACTORYPASS} ${DOCKER_REGISTRY}"
