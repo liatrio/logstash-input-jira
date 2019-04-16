@@ -40,5 +40,8 @@ pipeline {
     fixed {
       slackSend channel: "#${env.SLACK_CHANNEL}", color: "good",  message: "Build recovered: ${env.JOB_NAME} on #${env.BUILD_NUMBER}"
     }
+    success {
+      slackSend channel: "#${env.SLACK_CHANNEL}", color: "good",  message: "Build was succesfully deployed: ${env.JOB_NAME} on #${env.BUILD_NUMBER}"
+    }
   }
 }
