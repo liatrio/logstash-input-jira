@@ -35,7 +35,7 @@ pipeline {
     //NEED to figure out how to grab latest chart version.
     stage('Deploy new Image') {
       steps {
-        container('logstash') {
+        container('maven') {
           withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', variable: 'CREDS', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
             sh """
               helm repo add liatrio-artifactory "https://artifactory.liatr.io/artifactory/helm" --username $USERNAME --password $PASSWORD
