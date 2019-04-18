@@ -35,17 +35,19 @@ pipeline {
     //NEED to figure out how to grab latest chart version.
     stage('Deploy new Image') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', variable: 'CREDS', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-          sh """
-            helm repo add liatrio-artifactory "https://artifactory.liatr.io/artifactory/helm" --username $USERNAME --password $PASSWORD
-            helm repo update
-            """
-          sh "helm upgrade lead-dashboard liatrio-artifactory/logstash-input-jira --namespace toolchain --set logstash-jira.image.tag=${GIT_COMMIT[0..10]}"
+        container('logstash') {
+          withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', variable: 'CREDS', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+            sh """
+              helm repo add liatrio-artifactory "https://artifactory.liatr.io/artifactory/helm" --username $USERNAME --password $PASSWORD
+              helm repo update
+              """
+            sh "helm upgrade lead-dashboard liatrio-artifactory/logstash-input-jira --namespace toolchain --set logstash-jira.image.tag=${GIT_COMMIT[0..10]}"
        }
+        }
       }
     }
   }
-  post {
+  /*post {
     failure {
       slackSend channel: "#${env.SLACK_CHANNEL}",  color: "danger", message: "Build failed: ${env.JOB_NAME} on build #${env.BUILD_NUMBER} (<${env.BUILD_URL}|go there>)"
     }
@@ -55,5 +57,5 @@ pipeline {
     success {
       slackSend channel: "#${env.SLACK_CHANNEL}", color: "good",  message: "Build was successfully deployed: ${env.JOB_NAME} on #${env.BUILD_NUMBER} (<${env.BUILD_URL}|go there>)"
     }
-  }
+  } */
 }
