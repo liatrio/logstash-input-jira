@@ -39,6 +39,7 @@ pipeline {
         container('maven') {
           withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', variable: 'CREDS', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
             sh """
+              helm init --client-only
               helm repo add liatrio-artifactory "https://artifactory.liatr.io/artifactory/helm" --username $USERNAME --password $PASSWORD
               helm repo update
               """
