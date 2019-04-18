@@ -34,6 +34,7 @@ pipeline {
     }
     //NEED to figure out how to grab latest chart version.
     stage('Deploy new Image') {
+      agent { label 'jenkins-maven-java11' }
       steps {
         container('maven') {
           withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', variable: 'CREDS', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
