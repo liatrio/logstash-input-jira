@@ -4,7 +4,7 @@ pipeline {
   }
   environment {
     ORG = 'liatrio'
-    APP_NAME = 'logstash-input-jira'
+    APP_NAME = 'logstash-jira'
     //CHARTMUSEUM_CREDS = credentials('jenkins-x-chartmuseum')
     DOCKER_REGISTRY = 'docker.artifactory.liatr.io'
     SLACK_CHANNEL="flywheel"
@@ -42,7 +42,7 @@ pipeline {
               helm init --client-only
               helm repo add liatrio-artifactory "https://artifactory.liatr.io/artifactory/helm" --username $USERNAME --password $PASSWORD
               helm repo update
-              helm upgrade lead-dashboard liatrio-artifactory/lead-dashboard --namespace toolchain --set logstash-jira.image.tag=${GIT_COMMIT[0..10]}
+              helm upgrade lead-dashboard liatrio-artifactory/lead-dashboard --namespace toolchain --set logstash-jira.image.tag=${GIT_COMMIT[0..10]} --set elasticsearch.volumeClaimTemplate.storageClassName=gp2
               """
        }
         }
