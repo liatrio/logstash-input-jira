@@ -13,7 +13,7 @@ pipeline {
     stage('Build image') {
       steps {
         container('logstash') {
-          sh "docker build -t ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:${GIT_COMMIT[0..10]} -t ${DOCKER_REGISTRY}/${ORG}/${APP_NAME}:latest ."
+          sh "docker build -t ${DOCKER_REGISTRY}/${APP_NAME}:${GIT_COMMIT[0..10]} -t ${DOCKER_REGISTRY}/${APP_NAME}:latest ."
         }
       }
     }
