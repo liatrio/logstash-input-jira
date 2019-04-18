@@ -34,12 +34,14 @@ pipeline {
     }
     //NEED to figure out how to grab latest chart version.
     stage('Deploy new Image') {
-      withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', variable: 'CREDS', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-        sh """
-          helm repo add liatrio-artifactory "https://artifactory.liatr.io/artifactory/helm" --username $USERNAME --password $PASSWORD
-          helm repo update
-          """
-        sh "helm upgrade lead-dashboard liatrio-artifactory/logstash-input-jira --namespace toolchain --set logstash-jira.image.tag=${GIT_COMMIT[0..10]}"
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'artifactory-takumin', variable: 'CREDS', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+          sh """
+            helm repo add liatrio-artifactory "https://artifactory.liatr.io/artifactory/helm" --username $USERNAME --password $PASSWORD
+            helm repo update
+            """
+          sh "helm upgrade lead-dashboard liatrio-artifactory/logstash-input-jira --namespace toolchain --set logstash-jira.image.tag=${GIT_COMMIT[0..10]}"
+       }
       }
     }
   }
