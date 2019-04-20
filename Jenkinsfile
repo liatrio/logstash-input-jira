@@ -23,7 +23,7 @@ pipeline {
       steps {
         container('logstash') {
           script {
-          docker.withRegistry("https://${DOCKER_REGISTRY}", 'artifactory-takumin') {
+          docker.withRegistry("https://${DOCKER_REGISTRY}", 'artifactory-credentials') {
             sh """
               docker push ${DOCKER_REGISTRY}/${APP_NAME}:${GIT_COMMIT[0..10]}
               docker push ${DOCKER_REGISTRY}/${APP_NAME}:latest
