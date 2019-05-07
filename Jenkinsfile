@@ -23,7 +23,7 @@ pipeline {
       steps {
         container('skaffold') {
           script {
-          docker.withRegistry("https://${DOCKER_REGISTRY}", 'artifactory-credentials') {
+          docker.withRegistry("https://${DOCKER_REGISTRY}", 'jenkins-credential-artifactory') {
             sh """
               docker push ${DOCKER_REGISTRY}/${APP_NAME}:${GIT_COMMIT[0..10]}
               docker push ${DOCKER_REGISTRY}/${APP_NAME}:latest
