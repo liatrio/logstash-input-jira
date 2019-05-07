@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "logstash"
+    label "builder-images"
   }
   environment {
     ORG = 'liatrio'
