@@ -1,6 +1,6 @@
 pipeline {
   agent {
-    label "builder-images"
+    label "lead-toolchain-skaffold"
   }
   environment {
     ORG = 'liatrio'
