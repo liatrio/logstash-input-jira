@@ -11,7 +11,7 @@ pipeline {
   stages {
     stage('Build image') {
       steps {
-        container('logstash') {
+        container('skaffold') {
           sh "docker build -t ${DOCKER_REGISTRY}/${APP_NAME}:${GIT_COMMIT[0..10]} -t ${DOCKER_REGISTRY}/${APP_NAME}:latest ."
         }
       }
@@ -21,7 +21,7 @@ pipeline {
         branch 'master'
       }
       steps {
-        container('logstash') {
+        container('skaffold') {
           script {
           docker.withRegistry("https://${DOCKER_REGISTRY}", 'artifactory-credentials') {
             sh """
